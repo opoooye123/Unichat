@@ -35,7 +35,7 @@ export const SocketProvider = ({ children }: SocketProviderProps) => {
     }
 
     // Create new socket connection
-    const newSocket: Socket = io('https://unichat-5ss8.onrender.com', {
+    const newSocket: Socket = io('http://localhost:5000', {
       auth: {
         token, // ← Clean: no extra space or object nesting
       },

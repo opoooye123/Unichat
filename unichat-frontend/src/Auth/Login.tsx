@@ -15,7 +15,7 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/login', { email });
+      const res = await api.post('api/auth/login', { email });
       login(res.data.token);
       toast.success('Welcome back! 🔥');
       navigate('/home');

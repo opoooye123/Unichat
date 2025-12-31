@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import Register from './Auth/Resgister';
+import Register from './Auth/Register'; // ← Fixed typo: was Resgister
 import VerifyOTP from './Auth/VerifyOTP';
 import Login from './Auth/Login';
 import Home from './components/Home';
