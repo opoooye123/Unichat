@@ -35,7 +35,7 @@ const server = http.createServer(app);
 const allowedOrigins = [
   "http://localhost:5173",     // Local development
   "http://localhost:3000",  
-  "https://unichat-cswa.vercel.app"   // Alternative local port
+  "https://unichat-sigma.vercel.app"   // Alternative local port
   // "https://your-frontend.vercel.app",  // ← Add this after Vercel deployment
   // "https://unichat.ng",                // ← Add custom domain later if you have one
 ];

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000'
+  baseURL: 'https://unichat-5ss8.onrender.com/api'
 });
 
 api.interceptors.request.use((config) => {
