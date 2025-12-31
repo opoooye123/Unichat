@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const fetchProfile = async () => {
     try {
-      const res = await api.get('api/users/me');
+      const res = await api.get('/users/me');
       setUser(res.data);
     } catch (err) {
       toast.error('Session expired. Please login again.');
