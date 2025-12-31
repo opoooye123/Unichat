@@ -28,40 +28,57 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
-const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:5173",
-    methods: ["GET", "POST"],
-    credentials: true
-  }
-});
+// =======================
+// DYNAMIC CORS CONFIG
+// =======================
+// Add your deployed frontend URL here after deployment
+const allowedOrigins = [
+  "http://localhost:5173",     // Local development
+  "http://localhost:3000",  
+  "https://unichat-cswa.vercel.app"   // Alternative local port
+  // "https://your-frontend.vercel.app",  // ← Add this after Vercel deployment
+  // "https://unichat.ng",                // ← Add custom domain later if you have one
+];
 
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`CORS blocked origin: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE"],
+};
+
+// Apply CORS to Express
+app.use(cors(corsOptions));
+
+// Apply CORS to Socket.io
+const io = new Server(server, {
+  cors: corsOptions,
+});
 
 // =======================
 // 4. MIDDLEWARE
 // =======================
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-    credentials: true
-  })
-);
-
-app.use(express.json()); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Optional, for form data
-
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // =======================
 // 5. DATABASE CONNECTION
 // =======================
 mongoose
-    .connect(process.env.MONGO_URI)
-    .then(() => {
-        console.log('MongoDB connected');
-    })
-    .catch((err) => {
-        console.error('MongoDB connection error:', err);
-    });
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    console.log('MongoDB connected successfully');
+  })
+  .catch((err) => {
+    console.error('MongoDB connection error:', err);
+  });
 
 // =======================
 // 6. API ROUTES
@@ -80,6 +97,8 @@ socketHandler(io);
 // 8. START SERVER
 // =======================
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Local: http://localhost:${PORT}`);
 });
