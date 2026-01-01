@@ -21,20 +21,17 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     if (!socket) return;
-
-    socket.on('matchFound', ({ sessionId, partnerId }: { sessionId: string; partnerId: string }) => {
-      toast.dismiss('queue'); // ← Dismiss the "Searching..." toast
+    socket.on('matchFound', ({ sessionId, partnerId, isInitiator }: { sessionId: string; partnerId: string; isInitiator: boolean }) => {  // ← Added isInitiator
+      toast.dismiss('queue');
       toast.success('Match found! 🎉 Starting chat...');
       setInQueue(false);
-      navigate('/chat', { state: { sessionId, partnerId } });
+      navigate('/chat', { state: { sessionId, partnerId, isInitiator } });
     });
-
     socket.on('rejoinQueue', () => {
       setInQueue(true);
       toast.dismiss('queue');
       toast.loading('Searching for someone... ⏳', { id: 'queue' });
     });
-
     return () => {
       socket.off('matchFound');
       socket.off('rejoinQueue');
@@ -43,23 +40,22 @@ const Home: React.FC = () => {
 
   const handleJoinQueue = () => {
     if (inQueue) return;
-
     let targetSchool: string | undefined = undefined;
     if (selected === 'any') targetSchool = 'any';
     else if (selected === 'same') targetSchool = 'same';
     else targetSchool = selected;
-
     socket?.emit('joinQueue', { targetSchool });
     setInQueue(true);
     toast.loading('Searching for someone... ⏳', { id: 'queue' });
   };
 
-const handleCancel = () => {
-  socket?.emit('leaveQueue'); // ← New dedicated event
-  setInQueue(false);
-  toast.dismiss('queue');
-  toast.dismiss('Search cancelled');
-};
+  const handleCancel = () => {
+    socket?.emit('leaveQueue');
+    setInQueue(false);
+    toast.dismiss('queue');
+    toast('Search cancelled');
+  };
+
   if (!user) return null;
 
   return (
@@ -74,10 +70,8 @@ const handleCancel = () => {
             Your school: <span className="font-bold text-purple-600">{user.schoolId.toUpperCase()}</span>
           </p>
         </div>
-
         <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur rounded-3xl shadow-2xl p-10">
           <h2 className="text-3xl font-bold text-center mb-10">Who do you want to chat with?</h2>
-
           <div className="grid gap-6 mb-10">
             {/* Anyone */}
             <button
@@ -95,7 +89,6 @@ const handleCancel = () => {
                 <div className="text-gray-600 dark:text-gray-400">Random match from any school (including yours)</div>
               </div>
             </button>
-
             {/* Same School */}
             <button
               onClick={() => setSelected('same')}
@@ -117,7 +110,6 @@ const handleCancel = () => {
                 <div className="text-gray-600 dark:text-gray-400">Connect with fellow {user.schoolId.toUpperCase()} students</div>
               </div>
             </button>
-
             {/* Other Schools */}
             {schools.filter(s => s.id !== user.schoolId).map(school => (
               <button
@@ -143,7 +135,6 @@ const handleCancel = () => {
               </button>
             ))}
           </div>
-
           {!inQueue ? (
             <button
               onClick={handleJoinQueue}
@@ -163,7 +154,6 @@ const handleCancel = () => {
             </div>
           )}
         </div>
-
         <button onClick={logout} className="block mx-auto mt-10 text-gray-600 hover:text-red-600">
           Logout
         </button>

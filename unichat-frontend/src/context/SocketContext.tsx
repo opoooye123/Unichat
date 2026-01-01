@@ -1,17 +1,24 @@
-// src/context/SocketContext.tsx
-
-import { createContext, useContext, useEffect, useState} from 'react';
-import type { ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { AuthContext } from './AuthContext';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
 
 interface SocketContextType {
   socket: Socket | null;
+  sessionId: string | null;
+  partnerId: string | null;
+  setSession: (sessionId: string, partnerId: string) => void;
+  clearSession: () => void;
 }
 
-export const SocketContext = createContext<SocketContextType>({ socket: null });
+export const SocketContext = createContext<SocketContextType>({
+  socket: null,
+  sessionId: null,
+  partnerId: null,
+  setSession: () => {},
+  clearSession: () => {},
+});
 
 interface SocketProviderProps {
   children: ReactNode;
@@ -21,62 +28,55 @@ export const SocketProvider = ({ children }: SocketProviderProps) => {
   const auth = useContext(AuthContext);
   const token = auth?.token ?? null;
   const logout = auth?.logout ?? (() => {});
-  const navigate = useNavigate();
 
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [partnerId, setPartnerId] = useState<string | null>(null);
+
+  const setSession = (sid: string, pid: string) => {
+    setSessionId(sid);
+    setPartnerId(pid);
+  };
+
+  const clearSession = () => {
+    setSessionId(null);
+    setPartnerId(null);
+  };
 
   useEffect(() => {
     if (!token) {
-      if (socket) {
-        socket.disconnect();
-        setSocket(null);
-      }
+      socket?.disconnect();
+      setSocket(null);
       return;
     }
 
-    // Create new socket connection
-    const newSocket: Socket = io('https://unichat-5ss8.onrender.com', {
-      auth: {
-        token, // ← Clean: no extra space or object nesting
-      },
-      transports: ['websocket'], // Recommended for better reliability
+    const newSocket = io('https://unichat-5ss8.onrender.com', {
+      auth: { token },
+      transports: ['websocket'],
     });
 
-    newSocket.on('connect', () => {
-      console.log('✅ Socket connected successfully');
+    newSocket.on('connect', () => console.log('Socket connected:', newSocket.id));
+
+    // When backend sends match
+    newSocket.on('matchFound', ({ sessionId: sid, partnerId: pid }) => {
+      setSession(sid, pid);
+      toast.success('New partner found!');
     });
 
-    newSocket.on('connect_error', (err) => {
-      console.error('Socket connection error:', err.message);
-
-      if (err.message === 'BANNED') {
-        toast.error('You are banned from Unichat.');
-        logout();
-        navigate('/login');
-      } else if (err.message.includes('Invalid token') || err.message.includes('Unauthorized')) {
-        toast.error('Session expired. Please log in again.');
-        logout();
-        navigate('/login');
-      }
-    });
-
-    newSocket.on('banned', ({ reason }: { reason: string }) => {
-      toast.error(`You have been banned: ${reason}`);
-      logout();
-      navigate('/login');
+    newSocket.on('rejoinQueue', () => {
+      clearSession();
+      newSocket.emit('joinQueue', { targetSchool: 'any' });
     });
 
     setSocket(newSocket);
 
-    // Cleanup: disconnect when token changes or component unmounts
     return () => {
       newSocket.disconnect();
-      setSocket(null);
     };
-  }, [token, logout, navigate]);
+  }, [token]);
 
   return (
-    <SocketContext.Provider value={{ socket }}>
+    <SocketContext.Provider value={{ socket, sessionId, partnerId, setSession, clearSession }}>
       {children}
     </SocketContext.Provider>
   );

@@ -11,25 +11,32 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  e.preventDefault();
+  setLoading(true);
+  try {
+    const res = await api.post('/auth/login', { email });
 
-    try {
-      const res = await api.post('/auth/login', { email });
-      login(res.data.token);
-      toast.success('Welcome back! 🔥');
-      navigate('/home');
-    } catch (err: any) {
-      const message = err.response?.data?.message || 'Login failed';
-      toast.error(message);
+    toast.success('OTP sent to your email!');
 
-      if (message === 'Email not verified') {
-        navigate('/verify', { state: { email } });
-      }
-    } finally {
-      setLoading(false);
+    // ✅ ADD THIS LINE
+    localStorage.setItem('auth_email', email);
+
+    navigate('/verify', { state: { email } });
+  } catch (err: any) {
+    const message = err.response?.data?.message || 'Login failed';
+    toast.error(message);
+
+    if (message === 'Email not verified') {
+      // ✅ ADD THIS LINE TOO
+      localStorage.setItem('auth_email', email);
+
+      navigate('/verify', { state: { email } });
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600">
@@ -38,7 +45,6 @@ const Login: React.FC = () => {
         <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
           Connect with students across Nigerian universities 🇳🇬
         </p>
-
         <form onSubmit={handleSubmit}>
           <input
             type="email"
@@ -49,21 +55,19 @@ const Login: React.FC = () => {
             required
             disabled={loading}
           />
-
           <button
             type="submit"
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 rounded-lg text-lg transition"
           >
-            {loading ? 'Logging in...' : 'Login / Register'}
+            {loading ? 'Sending OTP...' : 'Login / Register'}  {/* ← Minor text update */}
           </button>
         </form>
-
         <p className="mt-6 text-center text-sm text-gray-500">
           Only verified university emails allowed
         </p>
       </div>
-    </div> 
+    </div>
   );
 };
 

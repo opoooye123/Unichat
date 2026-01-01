@@ -9,10 +9,12 @@ exports.getProfile = async (req, res) => {
             schoolId: user.schoolId,
             verified: user.verified,
             status: user.status,
-            banCount: user.banCount
+            banCount: user.banCount,
+            banReason: user.banReason,  // ← Added for frontend display
+            banExpiresAt: user.banExpiresAt
         });
     } catch (error) {
-        console.error(error);
+        console.error('Get profile error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 };
