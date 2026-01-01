@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
 import toast from 'react-hot-toast';
-import { useAuth } from '../hook/useAuth';
+
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   setLoading(true);
   try {
-    const res = await api.post('/auth/login', { email });
+
 
     toast.success('OTP sent to your email!');
 

@@ -27,7 +27,6 @@ interface SocketProviderProps {
 export const SocketProvider = ({ children }: SocketProviderProps) => {
   const auth = useContext(AuthContext);
   const token = auth?.token ?? null;
-  const logout = auth?.logout ?? (() => {});
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
