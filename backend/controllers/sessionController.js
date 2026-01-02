@@ -1,10 +1,12 @@
 const Session = require('../models/Session');
+
 // Start a video session
 exports.startSession = async (req, res) => {
     try {
         const { targetUserId } = req.body;
         if (!targetUserId) return res.status(400).json({ message: 'Target user required' });
         if (targetUserId === req.user._id.toString()) return res.status(400).json({ message: 'Cannot session with self' });
+
         const session = new Session({
             participants: [req.user._id, targetUserId],
             status: 'active',
@@ -17,6 +19,7 @@ exports.startSession = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
 // End a video session
 exports.endSession = async (req, res) => {
     try {
@@ -34,3 +37,5 @@ exports.endSession = async (req, res) => {
         res.status(500).json({ message: 'Server error' });
     }
 };
+
+// NOTE: If this is redundant with socket matching, consider removing or triggering socket joinQueue here for Omegle-like flow.

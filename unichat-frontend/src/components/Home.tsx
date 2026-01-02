@@ -1,27 +1,41 @@
+// Home.tsx updated with Logo.dev and email_domain
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hook/useAuth';
 import { useSocket } from '../hook/useSocket';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import api from '../utils/api';
 
-const schools = [
-  { id: 'unilag', name: 'University of Lagos (UNILAG)' },
-  { id: 'futa', name: 'Federal University of Technology Akure (FUTA)' },
-  { id: 'babcock', name: 'Babcock University' },
-  { id: 'caleb', name: 'Caleb University' },
-  { id: 'pau', name: 'Pan-Atlantic University (PAU)' },
-];
+interface School {
+  id: string;
+  name: string;
+  email_domain: string; // UPDATED: Add email_domain
+}
 
 const Home: React.FC = () => {
   const { user, logout } = useAuth();
   const socket = useSocket();
   const [selected, setSelected] = useState<'any' | 'same' | string>('any');
   const [inQueue, setInQueue] = useState(false);
+  const [schools, setSchools] = useState<School[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
+    const fetchSchools = async () => {
+      try {
+        const res = await api.get('/schools');
+        setSchools(res.data); // Now includes email_domain
+      } catch (err) {
+        toast.error('Failed to load schools');
+      }
+    };
+    fetchSchools();
+  }, []);
+
+  useEffect(() => {
     if (!socket) return;
-    socket.on('matchFound', ({ sessionId, partnerId, isInitiator }: { sessionId: string; partnerId: string; isInitiator: boolean }) => {  // ← Added isInitiator
+    socket.on('matchFound', ({ sessionId, partnerId, isInitiator }) => {
       toast.dismiss('queue');
       toast.success('Match found! 🎉 Starting chat...');
       setInQueue(false);
@@ -39,125 +53,97 @@ const Home: React.FC = () => {
   }, [socket, navigate]);
 
   const handleJoinQueue = () => {
-    if (inQueue) return;
-    let targetSchool: string | undefined = undefined;
-    if (selected === 'any') targetSchool = 'any';
-    else if (selected === 'same') targetSchool = 'same';
-    else targetSchool = selected;
-    socket?.emit('joinQueue', { targetSchool });
+    if (!socket) return toast.error('Connection error');
     setInQueue(true);
     toast.loading('Searching for someone... ⏳', { id: 'queue' });
+    socket.emit('joinQueue', { targetSchool: selected });
   };
 
   const handleCancel = () => {
-    socket?.emit('leaveQueue');
+    if (!socket) return;
     setInQueue(false);
     toast.dismiss('queue');
-    toast('Search cancelled');
+    socket.emit('leaveQueue');
   };
 
-  if (!user) return null;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 dark:from-gray-900 dark:to-black flex items-center justify-center p-6">
-      <div className="max-w-2xl w-full">
-        <div className="text-center mb-12">
-          <h1 className="text-6xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            Unichat 🇳🇬
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-purple-500 to-blue-600 p-6">
+      <div className="w-full max-w-xl bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-pink-600">
+            Unichat
           </h1>
-          <p className="text-2xl mt-4">Welcome back, {user.name.split(' ')[0]}!</p>
-          <p className="text-lg text-gray-700 dark:text-gray-300">
-            Your school: <span className="font-bold text-purple-600">{user.schoolId.toUpperCase()}</span>
-          </p>
+          <p className="text-xl">Welcome, {user?.name}!</p>
         </div>
-        <div className="bg-white/90 dark:bg-gray-800/90 backdrop-blur rounded-3xl shadow-2xl p-10">
-          <h2 className="text-3xl font-bold text-center mb-10">Who do you want to chat with?</h2>
-          <div className="grid gap-6 mb-10">
-            {/* Anyone */}
+        <p className="text-2xl mb-8 text-center">Who do you want to chat with? 👥</p>
+        <div className="space-y-4 mb-10">
+          <button
+            onClick={() => setSelected('any')}
+            className={`w-full p-6 rounded-2xl transition flex items-center gap-4 ${
+              selected === 'any' ? 'bg-purple-600 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <div className="text-3xl">🌍</div>
+            <div className="text-left flex-1">
+              <div className="text-2xl font-bold">Anyone</div>
+              <div className="text-gray-600 dark:text-gray-400">Random student from any uni</div>
+            </div>
+          </button>
+          <button
+            onClick={() => setSelected('same')}
+            className={`w-full p-6 rounded-2xl transition flex items-center gap-4 ${
+              selected === 'same' ? 'bg-purple-600 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <div className="text-3xl">🏫</div>
+            <div className="text-left flex-1">
+              <div className="text-2xl font-bold">My School</div>
+              <div className="text-gray-600 dark:text-gray-400">Someone from {user?.schoolId}</div>
+            </div>
+          </button>
+          {schools.map((school) => (
             <button
-              onClick={() => setSelected('any')}
-              disabled={inQueue}
-              className={`p-8 rounded-3xl border-4 transition-all flex items-center gap-6 ${
-                selected === 'any'
-                  ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/40 shadow-2xl scale-105'
-                  : 'border-gray-300 dark:border-gray-600 hover:border-purple-400'
-              }`}
-            >
-              <div className="text-6xl">🌍</div>
-              <div className="text-left flex-1">
-                <div className="text-2xl font-bold">Anyone</div>
-                <div className="text-gray-600 dark:text-gray-400">Random match from any school (including yours)</div>
-              </div>
-            </button>
-            {/* Same School */}
-            <button
-              onClick={() => setSelected('same')}
-              disabled={inQueue}
-              className={`p-8 rounded-3xl border-4 transition-all flex items-center gap-6 ${
-                selected === 'same'
-                  ? 'border-green-500 bg-green-50 dark:bg-green-900/40 shadow-2xl scale-105'
-                  : 'border-gray-300 dark:border-gray-600 hover:border-green-400'
+              key={school.id}
+              onClick={() => setSelected(school.id)}
+              className={`w-full p-6 rounded-2xl transition flex items-center gap-4 ${
+                selected === school.id ? 'bg-purple-600 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
               }`}
             >
               <img
-                src={`/logos/${user.schoolId}.png`}
-                alt="My School"
-                className="w-20 h-20 rounded-full object-contain bg-white shadow-lg"
-                onError={(e) => (e.currentTarget.src = 'https://picsum.photos/80/80?blur=2')}
+                src={`https://img.logo.dev/${school.email_domain}?size=80&fallback=monogram`} // UPDATED: Use Logo.dev with email_domain
+                alt={school.name}
+                className="w-16 h-16 rounded-full bg-white shadow-lg"
+                onError={(e) => (e.currentTarget.src = `https://picsum.photos/80/80?random=${school.id}`)}
               />
               <div className="text-left flex-1">
-                <div className="text-2xl font-bold">Same School Only</div>
-                <div className="text-gray-600 dark:text-gray-400">Connect with fellow {user.schoolId.toUpperCase()} students</div>
+                <div className="text-2xl font-bold">{school.name}</div>
+                <div className="text-gray-600 dark:text-gray-400">Chat with students from {school.name}</div>
               </div>
             </button>
-            {/* Other Schools */}
-            {schools.filter(s => s.id !== user.schoolId).map(school => (
-              <button
-                key={school.id}
-                onClick={() => setSelected(school.id)}
-                disabled={inQueue}
-                className={`p-8 rounded-3xl border-4 transition-all flex items-center gap-6 ${
-                  selected === school.id
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40 shadow-2xl scale-105'
-                    : 'border-gray-300 dark:border-gray-600 hover:border-blue-400'
-                }`}
-              >
-                <img
-                  src={`/logos/${school.id}.png`}
-                  alt={school.name}
-                  className="w-20 h-20 rounded-full object-contain bg-white shadow-lg"
-                  onError={(e) => (e.currentTarget.src = 'https://picsum.photos/80/80?random=' + school.id)}
-                />
-                <div className="text-left flex-1">
-                  <div className="text-2xl font-bold">{school.name}</div>
-                  <div className="text-gray-600 dark:text-gray-400">Chat with students from {school.name}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-          {!inQueue ? (
-            <button
-              onClick={handleJoinQueue}
-              className="w-full py-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-2xl font-bold rounded-3xl shadow-2xl transform hover:scale-105 transition"
-            >
-              Start Chatting 🔥
-            </button>
-          ) : (
-            <div className="text-center">
-              <p className="text-3xl mb-6 animate-pulse">🔍 Searching for your match...</p>
-              <button
-                onClick={handleCancel}
-                className="px-12 py-5 bg-red-600 hover:bg-red-700 text-white text-xl font-bold rounded-2xl"
-              >
-                Cancel Search
-              </button>
-            </div>
-          )}
+          ))}
         </div>
-        <button onClick={logout} className="block mx-auto mt-10 text-gray-600 hover:text-red-600">
-          Logout
-        </button>
+        {!inQueue ? (
+          <button
+            onClick={handleJoinQueue}
+            className="w-full py-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-2xl font-bold rounded-3xl shadow-2xl transform hover:scale-105 transition"
+          >
+            Start Chatting 🔥
+          </button>
+        ) : (
+          <div className="text-center">
+            <p className="text-3xl mb-6 animate-pulse">🔍 Searching for your match...</p>
+            <button
+              onClick={handleCancel}
+              className="px-12 py-5 bg-red-600 hover:bg-red-700 text-white text-xl font-bold rounded-2xl"
+            >
+              Cancel Search
+            </button>
+          </div>
+        )}
       </div>
+      <button onClick={logout} className="block mx-auto mt-10 text-gray-600 hover:text-red-600">
+        Logout
+      </button>
     </div>
   );
 };

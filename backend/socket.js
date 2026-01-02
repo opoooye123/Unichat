@@ -7,14 +7,8 @@ const Ban = require("./models/Ban");
 // Connected users: userId => { socketId, schoolId }
 const connectedUsers = new Map();
 
-// School queues
-const matchQueues = {
-  unilag: new Set(),
-  futa: new Set(),
-  babcock: new Set(),
-  caleb: new Set(),
-  pau: new Set(),
-};
+// UPDATED: Dynamic school queues: schoolId => Set(userIds)
+const matchQueues = new Map();
 
 // User preferences: userId => { ownSchool, targetSchool, lastPartner }
 const userPreferences = new Map();
@@ -41,13 +35,13 @@ const socketHandler = (io) => {
   io.on("connection", (socket) => {
     const user = socket.user;
     const userId = user._id.toString();
-    const schoolId = user.schoolId;
+    const schoolId = user.schoolId.toString(); // UPDATED: toString for consistency
 
     console.log(`User connected: ${user.name} (${userId}) from ${schoolId} | Socket ID: ${socket.id}`);
     connectedUsers.set(userId, { socketId: socket.id, schoolId });
 
     const leaveQueue = () => {
-      matchQueues[schoolId]?.delete(userId);
+      matchQueues.get(schoolId)?.delete(userId);
       userPreferences.delete(userId);
     };
 
@@ -56,30 +50,38 @@ const socketHandler = (io) => {
       if (!preferences) return;
 
       const candidates = [];
+      const targetSchools = preferences.targetSchool === 'any' 
+        ? Array.from(matchQueues.keys()) 
+        : (preferences.targetSchool === 'same' ? [schoolId] : [preferences.targetSchool]);
 
-      for (const [s, queue] of Object.entries(matchQueues)) {
+      for (const s of targetSchools) {
+        const queue = matchQueues.get(s) || new Set();
         for (const candidateId of queue) {
           if (candidateId === userId) continue;
           const cPref = userPreferences.get(candidateId);
-          if (!cPref) continue;
-          if (cPref.lastPartner === userId || preferences.lastPartner === candidateId) continue;
+          if (!cPref || cPref.lastPartner === userId || preferences.lastPartner === candidateId) continue;
 
-          const userWants = cPref.targetSchool === "any" || (cPref.targetSchool === "same" && s === schoolId) || cPref.targetSchool === schoolId;
-          const candidateWants = preferences.targetSchool === "any" || (preferences.targetSchool === "same" && s === schoolId) || preferences.targetSchool === s;
+          // Simple mutual check
+          const matchesUser = preferences.targetSchool === 'any' || 
+            (preferences.targetSchool === 'same' && s === schoolId) || preferences.targetSchool === s;
+          const matchesCandidate = cPref.targetSchool === 'any' || 
+            (cPref.targetSchool === 'same' && s === cPref.ownSchool) || cPref.targetSchool === schoolId;
 
-          if (userWants && candidateWants) candidates.push(candidateId);
+          if (matchesUser && matchesCandidate) candidates.push({ id: candidateId, school: s });
         }
       }
 
-      if (!candidates.length) return console.log(`No match yet for ${userId}`);
+      if (!candidates.length) {
+        // UPDATED: Retry for Omegle-like waiting
+        setTimeout(findMatch, 5000); // Retry every 5s
+        return console.log(`No match yet for ${userId}`);
+      }
 
-      const partnerId = candidates[Math.floor(Math.random() * candidates.length)];
-      console.log(`Match found: ${userId} ↔ ${partnerId}`);
+      const { id: partnerId, school: partnerSchool } = candidates[Math.floor(Math.random() * candidates.length)];
 
       // Remove from queues
-      matchQueues[schoolId]?.delete(userId);
-      const partnerSchool = userPreferences.get(partnerId)?.ownSchool;
-      matchQueues[partnerSchool]?.delete(partnerId);
+      matchQueues.get(schoolId)?.delete(userId);
+      matchQueues.get(partnerSchool)?.delete(partnerId);
 
       // Update lastPartner
       preferences.lastPartner = partnerId;
@@ -110,7 +112,8 @@ const socketHandler = (io) => {
         targetSchool: targetSchool || "any",
         lastPartner: userPreferences.get(userId)?.lastPartner || null,
       });
-      matchQueues[schoolId]?.add(userId);
+      if (!matchQueues.has(schoolId)) matchQueues.set(schoolId, new Set()); // UPDATED: Dynamic
+      matchQueues.get(schoolId).add(userId);
       findMatch();
     });
 
@@ -124,7 +127,7 @@ const socketHandler = (io) => {
           await session.save();
         }
       }
-      matchQueues[schoolId]?.add(userId); // re-add to queue
+      matchQueues.get(schoolId)?.add(userId); // re-add to queue
       findMatch();
     });
 
@@ -133,6 +136,7 @@ const socketHandler = (io) => {
       socket.on(event, (data) => {
         const targetSocketId = connectedUsers.get(data.targetUserId)?.socketId;
         if (targetSocketId) io.to(targetSocketId).emit(event, data);
+        else socket.emit('signalingError', { msg: 'Partner offline' }); // UPDATED: Error handling
       });
     });
 
@@ -160,4 +164,4 @@ const socketHandler = (io) => {
   });
 };
 
-module.exports = socketHandler;
+module.exports = socketHandler
