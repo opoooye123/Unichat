@@ -97,8 +97,20 @@ const socketHandler = (io) => {
             status: "active",
           });
 
-          io.to(s1).emit("matchFound", { sessionId: session._id, partnerId });
-          io.to(s2).emit("matchFound", { sessionId: session._id, partnerId: userId });
+          // Assign initiator: lower userId is initiator
+          const initiatorId = userId < partnerId ? userId : partnerId;
+          const isUserInitiator = initiatorId === userId;
+
+          io.to(s1).emit("matchFound", { 
+            sessionId: session._id, 
+            partnerId, 
+            isInitiator: isUserInitiator 
+          });
+          io.to(s2).emit("matchFound", { 
+            sessionId: session._id, 
+            partnerId: userId, 
+            isInitiator: !isUserInitiator 
+          });
         } catch (err) {
           console.error("Session creation failed:", err);
         }
@@ -131,13 +143,11 @@ const socketHandler = (io) => {
       findMatch();
     });
 
-    // WebRTC signaling
-    ["offer", "answer", "ice-candidate"].forEach((event) => {
-      socket.on(event, (data) => {
-        const targetSocketId = connectedUsers.get(data.targetUserId)?.socketId;
-        if (targetSocketId) io.to(targetSocketId).emit(event, data);
-        else socket.emit('signalingError', { msg: 'Partner offline' }); // UPDATED: Error handling
-      });
+    // Unified WebRTC signaling
+    socket.on("signaling", (data) => {
+      const targetSocketId = connectedUsers.get(data.targetUserId)?.socketId;
+      if (targetSocketId) io.to(targetSocketId).emit("signaling", data);
+      else socket.emit('signalingError', { msg: 'Partner offline' });
     });
 
     // Chat messages

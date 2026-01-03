@@ -26,6 +26,11 @@ interface TypingData {
   isTyping: boolean;
 }
 
+interface SignalingMessage {
+  description?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
+}
+
 const VideoChat: React.FC = () => {
   const socket = useSocket();
   const { user: _user } = useAuth();
@@ -51,7 +56,11 @@ const VideoChat: React.FC = () => {
       return;
     }
 
-    let canceled = false; // Flag to skip async ops on simulated unmount
+    let canceled = false;
+    let makingOffer = false;
+    let ignoreOffer = false;
+    let isSettingRemoteAnswerPending = false;
+    const polite = !isInitiator; // Non-initiator is polite
 
     const pc = new RTCPeerConnection({
       iceServers: [
@@ -93,14 +102,33 @@ const VideoChat: React.FC = () => {
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         console.log('Sending ICE candidate');
-        socket.emit('ice-candidate', { candidate: event.candidate, targetUserId: partnerId });
+        socket.emit('signaling', { candidate: event.candidate, targetUserId: partnerId });
       }
     };
 
     pc.ontrack = (event) => {
-      console.log('ontrack fired', event.streams);
-      if (remoteVideoRef.current) {
+      console.log('ontrack fired with streams:', event.streams);
+      if (remoteVideoRef.current && event.streams[0]) {
         remoteVideoRef.current.srcObject = event.streams[0];
+        remoteVideoRef.current.play().catch(e => console.error('Remote video play error:', e));
+        console.log('Remote stream assigned and play attempted');
+      } else {
+        console.warn('No remote stream in ontrack or ref missing');
+      }
+    };
+
+    pc.onnegotiationneeded = async () => {
+      console.log('Negotiation needed');
+      if (canceled) return;
+      try {
+        makingOffer = true;
+        await pc.setLocalDescription();
+        console.log('Local Description SDP:', pc.localDescription?.sdp);
+        socket.emit('signaling', { description: pc.localDescription, targetUserId: partnerId });
+      } catch (err) {
+        console.error('Error in onnegotiationneeded:', err);
+      } finally {
+        makingOffer = false;
       }
     };
 
@@ -109,7 +137,7 @@ const VideoChat: React.FC = () => {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         localStreamRef.current = stream;
         if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-        return stream; // Resolve with stream for awaiting
+        return stream;
       } catch (err: any) {
         console.error('Mic/Cam Error:', err.name, err.message);
         let msg = 'Allow mic/camera access or try text chat.';
@@ -121,15 +149,15 @@ const VideoChat: React.FC = () => {
           msg = 'Connection closed unexpectedly. Retry matching.';
         }
         toast.error(msg);
-        throw err; // Propagate error if needed
+        throw err;
       }
     };
 
-    const mediaPromise = initMedia(); // Start media acquisition
+    const mediaPromise = initMedia();
 
     const addTracks = async () => {
       try {
-        const stream = await mediaPromise; // Wait for media
+        const stream = await mediaPromise;
         if (canceled) {
           console.log('Add tracks canceled due to unmount');
           return;
@@ -137,6 +165,7 @@ const VideoChat: React.FC = () => {
         stream.getTracks().forEach((track) => {
           if (pc.signalingState !== 'closed') {
             pc.addTrack(track, stream);
+            console.log('Added track:', track.kind);
           } else {
             console.warn('PC closed - skipping addTrack');
           }
@@ -145,47 +174,50 @@ const VideoChat: React.FC = () => {
         console.error('Error adding tracks:', err);
       }
     };
-    addTracks(); // Run async, but we'll await mediaPromise elsewhere
+    addTracks();
 
-    socket.on('offer', async ({ sdp }) => {
-      console.log('Received offer');
+    const handleSignalingMessage = async (msg: SignalingMessage) => {
       try {
-        await mediaPromise; // Ensure tracks added before processing offer
-        if (canceled) {
-          console.log('Offer handling canceled due to unmount');
-          return;
-        }
-        if (pc.signalingState === 'stable') {
-          await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          console.log('Answer SDP:', pc.localDescription?.sdp); // Debug: Check for m=video/audio lines
-          socket.emit('answer', { sdp: answer, targetUserId: partnerId });
-        } else {
-          console.warn('Ignoring offer in non-stable state');
+        const { description, candidate } = msg;
+        if (description) {
+          const readyForOffer =
+            !makingOffer &&
+            (pc.signalingState === 'stable' || isSettingRemoteAnswerPending);
+          const offerCollision = description.type === 'offer' && !readyForOffer;
+
+          ignoreOffer = !polite && offerCollision;
+          if (ignoreOffer) {
+            console.log('Ignoring offer due to collision');
+            return;
+          }
+
+          isSettingRemoteAnswerPending = description.type === 'answer';
+          await pc.setRemoteDescription(description);
+          console.log('Remote Description SDP:', pc.remoteDescription?.sdp);
+          isSettingRemoteAnswerPending = false;
+
+          if (description.type === 'offer') {
+            await pc.setLocalDescription();
+            console.log('Local Answer SDP:', pc.localDescription?.sdp);
+            socket.emit('signaling', { description: pc.localDescription, targetUserId: partnerId });
+          }
+        } else if (candidate) {
+          try {
+            await pc.addIceCandidate(candidate);
+          } catch (err) {
+            if (!ignoreOffer) {
+              throw err;
+            } else {
+              console.log('Ignored ICE candidate error due to ignored offer');
+            }
+          }
         }
       } catch (err) {
-        console.error('Error handling offer:', err);
+        console.error('Error handling signaling message:', err);
       }
-    });
+    };
 
-    socket.on('answer', async ({ sdp }) => {
-      console.log('Received answer');
-      if (pc.signalingState !== 'closed') {
-        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-      } else {
-        console.warn('PC closed - ignoring answer');
-      }
-    });
-
-    socket.on('ice-candidate', async ({ candidate }) => {
-      console.log('Received ICE candidate');
-      if (pc.signalingState !== 'closed') {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } else {
-        console.warn('PC closed - ignoring ICE');
-      }
-    });
+    socket.on('signaling', handleSignalingMessage);
 
     socket.on('chat-message', ({ message: msg }: ChatMessageData) => {
       setChatMessages((prev) => [...prev, { text: msg, from: 'partner' }]);
@@ -200,34 +232,13 @@ const VideoChat: React.FC = () => {
       toast.error(msg);
     });
 
-    if (isInitiator) {
-      console.log('Creating offer as initiator');
-      (async () => {
-        try {
-          await mediaPromise; // Ensure tracks added before offer
-          if (canceled) {
-            console.log('Offer creation canceled due to unmount');
-            return;
-          }
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          console.log('Offer SDP:', pc.localDescription?.sdp); // Debug: Check for m=video/audio lines
-          socket.emit('offer', { sdp: offer, targetUserId: partnerId });
-        } catch (err) {
-          console.error('Error creating offer:', err);
-        }
-      })();
-    }
-
     return () => {
-      canceled = true; // Cancel pending async ops
+      canceled = true;
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop());
       }
       pc.close();
-      socket.off('offer');
-      socket.off('answer');
-      socket.off('ice-candidate');
+      socket.off('signaling');
       socket.off('chat-message');
       socket.off('typing');
       socket.off('signalingError');
