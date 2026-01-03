@@ -1,15 +1,11 @@
 // routes/authRoutes.js
 const express = require('express');
 const router = express.Router();
-const authController = require('../controllers/authController');
+const authCtrl = require('../controllers/authController');
 
-// Register user (send OTP)
-router.post('/register', authController.register);
-
-// Verify OTP & get JWT
-router.post('/verify-otp', authController.verifyOtp);
-
-// Login user (no OTP)
-router.post('/login', authController.login);
+router.post('/register', authCtrl.register);
+router.post('/login', authCtrl.login);
+router.post('/verify-otp', authCtrl.verifyOtp);
+router.post('/resend-otp', authCtrl.resendOtp);
 
 module.exports = router;

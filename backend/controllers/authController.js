@@ -105,3 +105,36 @@ exports.login = async (req, res) => {
         res.status(500).json({ message: "Server error" });
     }
 };
+
+// 4️⃣ Resend OTP
+exports.resendOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) return res.status(400).json({ message: "Email required" });
+
+        const user = await User.findOne({ email });
+        if (!user) return res.status(404).json({ message: "User not found" });
+        if (!user.verified) return res.status(403).json({ message: "Email not verified" });
+
+        // Optional: Check if previous OTP is still valid
+        let otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
+        const now = new Date();
+
+        if (otpRecord && otpRecord.expiresAt > now) {
+            // If previous OTP still valid, reuse it
+            await sendEmail(email, 'Resent OTP', `Your OTP is: ${otpRecord.code}. Expires at ${otpRecord.expiresAt}.`);
+            return res.status(200).json({ message: 'OTP resent successfully' });
+        }
+
+        // Otherwise, generate new OTP
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        await Otp.create({ email, code, expiresAt });
+
+        await sendEmail(email, 'Resent OTP', `Your new OTP is: ${code}. Expires in 10 minutes.`);
+        res.status(200).json({ message: 'OTP resent successfully' });
+    } catch (err) {
+        console.error('Resend OTP error:', err);
+        res.status(500).json({ message: "Server error" });
+    }
+};
