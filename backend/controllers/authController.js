@@ -1,6 +1,6 @@
 const User = require('../models/User');
-const Otp = require('../models/Otp'); // UPDATED: Import Otp model
-const School = require('../models/School'); // UPDATED: Import School for dynamic domains
+const Otp = require('../models/Otp');
+const School = require('../models/School');
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/emailService');
 
@@ -12,21 +12,19 @@ exports.register = async (req, res) => {
         if (!name || !email) return res.status(400).json({ message: 'Name and email required' });
 
         const domain = email.split('@')[1];
-        const school = await School.findOne({ email_domain: domain }); // UPDATED: Query School model
+        const school = await School.findOne({ email_domain: domain });
         if (!school) return res.status(400).json({ message: 'Email domain not allowed' });
-        const schoolId = school._id; // UPDATED: Use School _id as ref
+        const schoolId = school._id;
 
         let user = await User.findOne({ email });
         if (user) return res.status(400).json({ message: 'User already exists' });
 
         user = await User.create({ name, email, schoolId });
         
-        // UPDATED: Use Otp model
         const code = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
         await Otp.create({ email, code, expiresAt });
 
-        // Send OTP via email
         await sendEmail(email, 'Your OTP Code', `Your OTP is: ${code}. Expires in 10 minutes.`);
         res.status(200).json({ message: 'OTP sent to your email' });
     } catch (err) {
@@ -41,7 +39,6 @@ exports.verifyOtp = async (req, res) => {
         const { email, otp } = req.body;
         if (!email || !otp) return res.status(400).json({ message: 'Email and OTP required' });
 
-        // UPDATED: Query Otp model
         const otpRecord = await Otp.findOne({ email, code: otp });
         if (!otpRecord) return res.status(400).json({ message: 'Invalid OTP' });
         if (new Date() > otpRecord.expiresAt) {
@@ -52,7 +49,6 @@ exports.verifyOtp = async (req, res) => {
         const user = await User.findOne({ email });
         if (!user) return res.status(400).json({ message: 'User not found' });
 
-        // UPDATED: Auto-unban if expired
         if (user.status === 'banned' && user.banExpiresAt && new Date() > user.banExpiresAt) {
             user.status = 'active';
             user.banExpiresAt = undefined;
@@ -60,9 +56,8 @@ exports.verifyOtp = async (req, res) => {
 
         user.verified = true;
         await user.save();
-        await Otp.deleteOne({ _id: otpRecord._id }); // UPDATED: Cleanup
+        await Otp.deleteOne({ _id: otpRecord._id });
 
-        // Issue JWT
         const token = jwt.sign(
             { id: user._id, schoolId: user.schoolId, status: user.status },
             process.env.JWT_SECRET,
@@ -75,7 +70,6 @@ exports.verifyOtp = async (req, res) => {
     }
 };
 
-// LOGIN (send OTP instead of direct token)
 exports.login = async (req, res) => {
     try {
         const { email } = req.body;
@@ -85,7 +79,6 @@ exports.login = async (req, res) => {
         if (!user) return res.status(404).json({ message: "User not found" });
         if (!user.verified) return res.status(403).json({ message: "Email not verified" });
 
-        // UPDATED: Auto-unban if expired
         if (user.status === 'banned' && user.banExpiresAt && new Date() > user.banExpiresAt) {
             user.status = 'active';
             user.banExpiresAt = undefined;
@@ -93,12 +86,18 @@ exports.login = async (req, res) => {
         }
         if (user.status === "banned") return res.status(403).json({ message: "User is banned" });
 
-        // UPDATED: Use Otp model
         const code = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-        await Otp.create({ email, code, expiresAt });
+        
+        const otpRecord = await Otp.create({ email, code, expiresAt });
+        console.log('Login OTP saved to DB:', otpRecord._id, 'Code:', code);
 
-        await sendEmail(email, 'Login OTP', `Your login OTP is: ${code}. Expires in 10 minutes.`);
+        const emailSent = await sendEmail(email, 'Login OTP', `Your login OTP is: ${code}. Expires in 10 minutes.`);
+        if (!emailSent) {
+            await Otp.deleteOne({ _id: otpRecord._id });
+            return res.status(500).json({ message: 'Failed to send OTP email' });
+        }
+
         res.status(200).json({ message: 'OTP sent for login' });
     } catch (err) {
         console.error('Login error:', err);
@@ -116,17 +115,14 @@ exports.resendOtp = async (req, res) => {
         if (!user) return res.status(404).json({ message: "User not found" });
         if (!user.verified) return res.status(403).json({ message: "Email not verified" });
 
-        // Optional: Check if previous OTP is still valid
         let otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
         const now = new Date();
 
         if (otpRecord && otpRecord.expiresAt > now) {
-            // If previous OTP still valid, reuse it
             await sendEmail(email, 'Resent OTP', `Your OTP is: ${otpRecord.code}. Expires at ${otpRecord.expiresAt}.`);
             return res.status(200).json({ message: 'OTP resent successfully' });
         }
 
-        // Otherwise, generate new OTP
         const code = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
         await Otp.create({ email, code, expiresAt });

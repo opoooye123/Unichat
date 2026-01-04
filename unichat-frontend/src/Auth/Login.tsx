@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-
+import api from '../utils/api'; // UPDATED: Import api if not already (assuming it's in utils/api)
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -9,33 +9,31 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  try {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      // UPDATED: Add the API call here
+      const response = await api.post('/auth/login', { email });
+      console.log('Login response:', response.data); // For debugging
 
+      toast.success('OTP sent to your email!');
 
-    toast.success('OTP sent to your email!');
-
-    // ✅ ADD THIS LINE
-    localStorage.setItem('auth_email', email);
-
-    navigate('/verify', { state: { email } });
-  } catch (err: any) {
-    const message = err.response?.data?.message || 'Login failed';
-    toast.error(message);
-
-    if (message === 'Email not verified') {
-      // ✅ ADD THIS LINE TOO
       localStorage.setItem('auth_email', email);
 
       navigate('/verify', { state: { email } });
-    }
-  } finally {
-    setLoading(false);
-  }
-  
-};
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Login failed';
+      toast.error(message);
 
+      if (message === 'Email not verified') {
+        localStorage.setItem('auth_email', email);
+
+        navigate('/verify', { state: { email } });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600">
@@ -59,7 +57,7 @@ const Login: React.FC = () => {
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 rounded-lg text-lg transition"
           >
-            {loading ? 'Sending OTP...' : 'Login / Register'}  {/* ← Minor text update */}
+            {loading ? 'Sending OTP...' : 'Login / Register'}
           </button>
         </form>
         <p className="mt-6 text-center text-sm text-gray-500">
