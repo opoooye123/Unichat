@@ -1,136 +1,55 @@
+// backend/controllers/authController.js - Refactored to password-based auth
 const User = require('../models/User');
-const Otp = require('../models/Otp');
 const School = require('../models/School');
 const jwt = require('jsonwebtoken');
-const sendEmail = require('../utils/emailService');
+const bcrypt = require('bcryptjs'); // UPDATED: Add bcrypt for password hashing
 
-// 1️⃣ Register & send OTP
+// Register with password
 exports.register = async (req, res) => {
-    try {
-        console.log("BODY:", req.body);
-        const { name, email } = req.body;
-        if (!name || !email) return res.status(400).json({ message: 'Name and email required' });
+  try {
+    console.log("Register BODY:", req.body);
+    const { name, email, password } = req.body;
+    if (!name || !email || !password) return res.status(400).json({ message: 'Name, email, and password required' });
 
-        const domain = email.split('@')[1];
-        const school = await School.findOne({ email_domain: domain });
-        if (!school) return res.status(400).json({ message: 'Email domain not allowed' });
-        const schoolId = school._id;
+    const domain = email.split('@')[1];
+    const school = await School.findOne({ email_domain: domain });
+    if (!school) return res.status(400).json({ message: 'Email domain not allowed' });
+    const schoolId = school._id;
 
-        let user = await User.findOne({ email });
-        if (user) return res.status(400).json({ message: 'User already exists' });
+    let user = await User.findOne({ email });
+    if (user) return res.status(400).json({ message: 'User already exists' });
 
-        user = await User.create({ name, email, schoolId });
-        
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-        await Otp.create({ email, code, expiresAt });
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-        await sendEmail(email, 'Your OTP Code', `Your OTP is: ${code}. Expires in 10 minutes.`);
-        res.status(200).json({ message: 'OTP sent to your email' });
-    } catch (err) {
-        console.error('Register error:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
+    user = await User.create({ name, email, schoolId, password: hashedPassword, verified: true }); // Set verified to true since no OTP
+
+    // Issue JWT immediately
+    const token = jwt.sign(
+      { id: user._id, schoolId: user.schoolId, status: user.status },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(201).json({ message: 'Registered successfully', token });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
 };
 
-// 2️⃣ Verify OTP & issue JWT
-exports.verifyOtp = async (req, res) => {
-    try {
-        const { email, otp } = req.body;
-        if (!email || !otp) return res.status(400).json({ message: 'Email and OTP required' });
-
-        const otpRecord = await Otp.findOne({ email, code: otp });
-        if (!otpRecord) return res.status(400).json({ message: 'Invalid OTP' });
-        if (new Date() > otpRecord.expiresAt) {
-            await Otp.deleteOne({ _id: otpRecord._id });
-            return res.status(400).json({ message: 'OTP expired' });
-        }
-
-        const user = await User.findOne({ email });
-        if (!user) return res.status(400).json({ message: 'User not found' });
-
-        if (user.status === 'banned' && user.banExpiresAt && new Date() > user.banExpiresAt) {
-            user.status = 'active';
-            user.banExpiresAt = undefined;
-        }
-
-        user.verified = true;
-        await user.save();
-        await Otp.deleteOne({ _id: otpRecord._id });
-
-        const token = jwt.sign(
-            { id: user._id, schoolId: user.schoolId, status: user.status },
-            process.env.JWT_SECRET,
-            { expiresIn: '7d' }
-        );
-        res.status(200).json({ message: 'Verified successfully', token });
-    } catch (err) {
-        console.error('Verify OTP error:', err);
-        res.status(500).json({ message: 'Server error' });
-    }
-};
-
+// Login with password
 exports.login = async (req, res) => {
-    try {
-        const { email } = req.body;
-        if (!email) return res.status(400).json({ message: "Email required" });
-
-        const user = await User.findOne({ email });
-        if (!user) return res.status(404).json({ message: "User not found" });
-        if (!user.verified) return res.status(403).json({ message: "Email not verified" });
-
-        if (user.status === 'banned' && user.banExpiresAt && new Date() > user.banExpiresAt) {
-            user.status = 'active';
-            user.banExpiresAt = undefined;
-            await user.save();
-        }
-        if (user.status === "banned") return res.status(403).json({ message: "User is banned" });
-
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-        
-        const otpRecord = await Otp.create({ email, code, expiresAt });
-        console.log('Login OTP saved to DB:', otpRecord._id, 'Code:', code);
-
-        const emailSent = await sendEmail(email, 'Login OTP', `Your login OTP is: ${code}. Expires in 10 minutes.`);
-        if (!emailSent) {
-            await Otp.deleteOne({ _id: otpRecord._id });
-            return res.status(500).json({ message: 'Failed to send OTP email' });
-        }
-
-        res.status(200).json({ message: 'OTP sent for login' });
-    } catch (err) {
-        console.error('Login error:', err);
-        res.status(500).json({ message: "Server error" });
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(400).json({ message: 'Invalid credentials' });
     }
-};
-
-// 4️⃣ Resend OTP
-exports.resendOtp = async (req, res) => {
-    try {
-        const { email } = req.body;
-        if (!email) return res.status(400).json({ message: "Email required" });
-
-        const user = await User.findOne({ email });
-        if (!user) return res.status(404).json({ message: "User not found" });
-        if (!user.verified) return res.status(403).json({ message: "Email not verified" });
-
-        let otpRecord = await Otp.findOne({ email }).sort({ createdAt: -1 });
-        const now = new Date();
-
-        if (otpRecord && otpRecord.expiresAt > now) {
-            await sendEmail(email, 'Resent OTP', `Your OTP is: ${otpRecord.code}. Expires at ${otpRecord.expiresAt}.`);
-            return res.status(200).json({ message: 'OTP resent successfully' });
-        }
-
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-        await Otp.create({ email, code, expiresAt });
-
-        await sendEmail(email, 'Resent OTP', `Your new OTP is: ${code}. Expires in 10 minutes.`);
-        res.status(200).json({ message: 'OTP resent successfully' });
-    } catch (err) {
-        console.error('Resend OTP error:', err);
-        res.status(500).json({ message: "Server error" });
-    }
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+    res.json({ token, user: { _id: user._id, name: user.name, email: user.email, schoolId: user.schoolId } }); // Return user data
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
 };

@@ -3,7 +3,6 @@ export interface User {
   name: string;
   email: string;
   schoolId: string;
-  verified: boolean;
   status: string;
   banCount: number;
 }

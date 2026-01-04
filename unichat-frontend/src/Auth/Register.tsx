@@ -1,59 +1,76 @@
+// frontend/src/components/Register.tsx - New component for register (add this file)
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../utils/api';
 import toast from 'react-hot-toast';
+import api from '../utils/api';
 
 const Register: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  try {
-    await api.post('/auth/register', { name, email });
-    toast.success('OTP sent to your email!');
-
-    // ✅ ADD THIS LINE
-    localStorage.setItem('auth_email', email);
-
-    navigate('/verify', { state: { email } });
-  } catch (err: any) {
-    toast.error(err.response?.data?.message || 'Registration failed');
-  }
-};
-
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const response = await api.post('/auth/register', { name, email, password });
+      localStorage.setItem('token', response.data.token);
+      toast.success('Registered successfully!');
+      navigate('/home');
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Registration failed';
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600">  {/* ← Synced gradient */}
-      <form onSubmit={handleSubmit} className="p-8 bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-96">  {/* ← Synced styling */}
-        <h2 className="text-4xl font-bold text-center mb-2">Join Unichat 🇳🇬</h2>  {/* ← Larger header */}
-        <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
-          Connect with students across Nigerian universities
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600">
+      <div className="p-8 bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-96">
+        <h1 className="text-4xl font-bold text-center mb-2">Unichat Register</h1>
+        <form onSubmit={handleSubmit}>
+          <input
+            type="text"
+            placeholder="Your name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full mb-4 p-4 border rounded-lg dark:bg-gray-700 text-lg"
+            required
+            disabled={loading}
+          />
+          <input
+            type="email"
+            placeholder="Your school email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full mb-4 p-4 border rounded-lg dark:bg-gray-700 text-lg"
+            required
+            disabled={loading}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full mb-6 p-4 border rounded-lg dark:bg-gray-700 text-lg"
+            required
+            disabled={loading}
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 rounded-lg text-lg transition"
+          >
+            {loading ? 'Registering...' : 'Register'}
+          </button>
+        </form>
+        <p className="mt-4 text-center text-sm">
+          Already have an account? <a href="/" className="text-blue-600 hover:underline">Login</a>
         </p>
-        <input
-          type="text"
-          placeholder="Full Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="w-full mb-4 p-4 border rounded-lg dark:bg-gray-700 text-lg"  
-          required
-        />
-        <input
-          type="email"
-          placeholder="School Email (e.g. name@unilag.edu.ng)"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full mb-6 p-4 border rounded-lg dark:bg-gray-700 text-lg"
-          required
-        />
-        <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 rounded-lg text-lg transition">  {/* ← Synced button */}
-          Send OTP
-        </button>
-        <p className="mt-6 text-center text-sm text-gray-500">
-          Already have an account? <a href="/login" className="text-blue-500 hover:underline">Login</a>
-        </p>
-      </form>
+      </div>
     </div>
   );
 };

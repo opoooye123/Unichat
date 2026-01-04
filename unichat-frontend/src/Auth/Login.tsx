@@ -1,35 +1,34 @@
-import React, { useState } from 'react';
+// frontend/src/components/Login.tsx - Updated for password
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import api from '../utils/api'; // UPDATED: Import api if not already (assuming it's in utils/api)
+import api from '../utils/api';
+import { useAuth } from '../hook/useAuth';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const { login, user } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (user) {
+      navigate('/home');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // UPDATED: Add the API call here
-      const response = await api.post('/auth/login', { email });
-      console.log('Login response:', response.data); // For debugging
-
-      toast.success('OTP sent to your email!');
-
-      localStorage.setItem('auth_email', email);
-
-      navigate('/verify', { state: { email } });
+      const response = await api.post('/auth/login', { email, password });
+      await login(response.data.token); // Pass only token; handle user in context
+      toast.success('Login successful!');
+      navigate('/home');
     } catch (err: any) {
       const message = err.response?.data?.message || 'Login failed';
       toast.error(message);
-
-      if (message === 'Email not verified') {
-        localStorage.setItem('auth_email', email);
-
-        navigate('/verify', { state: { email } });
-      }
     } finally {
       setLoading(false);
     }
@@ -48,6 +47,15 @@ const Login: React.FC = () => {
             placeholder="Your school email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            className="w-full mb-4 p-4 border rounded-lg dark:bg-gray-700 text-lg"
+            required
+            disabled={loading}
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             className="w-full mb-6 p-4 border rounded-lg dark:bg-gray-700 text-lg"
             required
             disabled={loading}
@@ -57,10 +65,13 @@ const Login: React.FC = () => {
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 rounded-lg text-lg transition"
           >
-            {loading ? 'Sending OTP...' : 'Login / Register'}
+            {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-        <p className="mt-6 text-center text-sm text-gray-500">
+        <p className="mt-4 text-center text-sm">
+          Don't have an account? <a href="/register" className="text-blue-600 hover:underline">Register</a>
+        </p>
+        <p className="mt-2 text-center text-sm text-gray-500">
           Only verified university emails allowed
         </p>
       </div>

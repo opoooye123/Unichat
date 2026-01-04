@@ -1,11 +1,9 @@
-// routes/authRoutes.js
+// backend/routes/authRoutes.js - Update routes
 const express = require('express');
 const router = express.Router();
-const authCtrl = require('../controllers/authController');
+const authController = require('../controllers/authController');
 
-router.post('/register', authCtrl.register);
-router.post('/login', authCtrl.login);
-router.post('/verify-otp', authCtrl.verifyOtp);
-router.post('/resend-otp', authCtrl.resendOtp);
+router.post('/register', authController.register);
+router.post('/login', authController.login);
 
 module.exports = router;

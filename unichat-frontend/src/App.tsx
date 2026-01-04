@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Register from './Auth/Register';
-import VerifyOTP from './Auth/VerifyOTP';
 import Login from './Auth/Login';
 import Home from './components/Home';
 import VideoChat from './components/VideoChat';
@@ -18,7 +17,6 @@ function App() {
           <Routes>
             <Route element={<PublicRoute />}>
               <Route path="/register" element={<Register />} />
-              <Route path="/verify" element={<VerifyOTP />} />
               <Route path="/login" element={<Login />} />
             </Route>
             <Route element={<ProtectedRoute />}>

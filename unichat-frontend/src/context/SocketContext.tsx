@@ -30,7 +30,7 @@ export const SocketProvider = ({ children }: SocketProviderProps) => {
       return;
     }
 
-    const newSocket = io('https://unichat-5ss8.onrender.com:', {
+    const newSocket = io('https://unichat-5ss8.onrender.com', {
       auth: { token },
       transports: ['websocket'],
     });

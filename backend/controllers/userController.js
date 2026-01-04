@@ -7,7 +7,6 @@ exports.getProfile = async (req, res) => {
             name: user.name,
             email: user.email,
             schoolId: user.schoolId,
-            verified: user.verified,
             status: user.status,
             banCount: user.banCount,
             banReason: user.banReason,  // ← Added for frontend display
