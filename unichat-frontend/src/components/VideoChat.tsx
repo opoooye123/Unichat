@@ -1,4 +1,4 @@
-// src/components/VideoChat.tsx
+// src/components/VideoChat.tsx - Refactored UI
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSocket } from '../hook/useSocket';
@@ -60,7 +60,7 @@ const VideoChat: React.FC = () => {
     let makingOffer = false;
     let ignoreOffer = false;
     let isSettingRemoteAnswerPending = false;
-    const polite = !isInitiator; // Non-initiator is polite
+    const polite = !isInitiator;
 
     const pc = new RTCPeerConnection({
       iceServers: [
@@ -86,7 +86,7 @@ const VideoChat: React.FC = () => {
     pc.oniceconnectionstatechange = () => {
       console.log('ICE state:', pc.iceConnectionState);
       if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'closed') {
-        toast.error('Connection failed - try again');
+        toast.error('Connection failed');
         skipChat();
       }
     };
@@ -94,7 +94,7 @@ const VideoChat: React.FC = () => {
     pc.onconnectionstatechange = () => {
       console.log('Connection state:', pc.connectionState);
       if (pc.connectionState === 'disconnected') {
-        toast.error('Stranger disconnected');
+        toast.error('Partner disconnected');
         skipChat();
       }
     };
@@ -111,9 +111,9 @@ const VideoChat: React.FC = () => {
       if (remoteVideoRef.current && event.streams[0]) {
         remoteVideoRef.current.srcObject = event.streams[0];
         remoteVideoRef.current.play().catch(e => console.error('Remote video play error:', e));
-        console.log('Remote stream assigned and play attempted');
+        console.log('Remote stream assigned');
       } else {
-        console.warn('No remote stream in ontrack or ref missing');
+        console.warn('No remote stream');
       }
     };
 
@@ -140,15 +140,7 @@ const VideoChat: React.FC = () => {
         return stream;
       } catch (err: any) {
         console.error('Mic/Cam Error:', err.name, err.message);
-        let msg = 'Allow mic/camera access or try text chat.';
-        if (err.name === 'NotReadableError') {
-          msg = 'Camera/mic in use by another app/tab. Close them and retry.';
-        } else if (err.name === 'NotAllowedError') {
-          msg = 'Permission denied. Check browser settings and allow access.';
-        } else if (err.name === 'InvalidStateError') {
-          msg = 'Connection closed unexpectedly. Retry matching.';
-        }
-        toast.error(msg);
+        toast.error('Media access error');
         throw err;
       }
     };
@@ -158,16 +150,10 @@ const VideoChat: React.FC = () => {
     const addTracks = async () => {
       try {
         const stream = await mediaPromise;
-        if (canceled) {
-          console.log('Add tracks canceled due to unmount');
-          return;
-        }
+        if (canceled) return;
         stream.getTracks().forEach((track) => {
           if (pc.signalingState !== 'closed') {
             pc.addTrack(track, stream);
-            console.log('Added track:', track.kind);
-          } else {
-            console.warn('PC closed - skipping addTrack');
           }
         });
       } catch (err) {
@@ -180,40 +166,25 @@ const VideoChat: React.FC = () => {
       try {
         const { description, candidate } = msg;
         if (description) {
-          const readyForOffer =
-            !makingOffer &&
-            (pc.signalingState === 'stable' || isSettingRemoteAnswerPending);
+          const readyForOffer = !makingOffer && (pc.signalingState === 'stable' || isSettingRemoteAnswerPending);
           const offerCollision = description.type === 'offer' && !readyForOffer;
 
           ignoreOffer = !polite && offerCollision;
-          if (ignoreOffer) {
-            console.log('Ignoring offer due to collision');
-            return;
-          }
+          if (ignoreOffer) return;
 
           isSettingRemoteAnswerPending = description.type === 'answer';
           await pc.setRemoteDescription(description);
-          console.log('Remote Description SDP:', pc.remoteDescription?.sdp);
           isSettingRemoteAnswerPending = false;
 
           if (description.type === 'offer') {
             await pc.setLocalDescription();
-            console.log('Local Answer SDP:', pc.localDescription?.sdp);
             socket.emit('signaling', { description: pc.localDescription, targetUserId: partnerId });
           }
         } else if (candidate) {
-          try {
-            await pc.addIceCandidate(candidate);
-          } catch (err) {
-            if (!ignoreOffer) {
-              throw err;
-            } else {
-              console.log('Ignored ICE candidate error due to ignored offer');
-            }
-          }
+          await pc.addIceCandidate(candidate);
         }
       } catch (err) {
-        console.error('Error handling signaling message:', err);
+        console.error('Signaling error:', err);
       }
     };
 
@@ -234,9 +205,7 @@ const VideoChat: React.FC = () => {
 
     return () => {
       canceled = true;
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop());
-      }
+      if (localStreamRef.current) localStreamRef.current.getTracks().forEach(track => track.stop());
       pc.close();
       socket.off('signaling');
       socket.off('chat-message');
@@ -270,18 +239,18 @@ const VideoChat: React.FC = () => {
   const skipChat = () => {
     if (!socket || !sessionId) return;
     socket.emit('skip', { sessionId });
-    toast('Finding next match...');
+    toast('Finding next...');
     navigate('/home');
   };
 
   const reportUser = async () => {
-    if (!partnerId) return toast.error('No partner to report');
-    const reason = prompt('Why are you reporting?');
+    if (!partnerId) return toast.error('No partner');
+    const reason = prompt('Report reason?');
     if (!reason) return;
 
     try {
       await api.post('/reports/submit', { reportedUserId: partnerId, reason });
-      toast.success('Report submitted');
+      toast.success('Reported');
       skipChat();
     } catch (err) {
       toast.error('Report failed');
@@ -289,52 +258,54 @@ const VideoChat: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-blue-600 to-purple-600 p-6">
-      <div className="w-full max-w-4xl bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8">
-        <h1 className="text-4xl font-extrabold text-center mb-8 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600">
-          Video Chat
-        </h1>
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-green-800 to-blue-900 p-4 text-gray-200">
+      <header className="text-center mb-4">
+        <h1 className="text-2xl font-bold text-green-400">Video Chat</h1>
+      </header>
 
-        <div className="flex gap-6 mb-8">
-          <video ref={localVideoRef} autoPlay muted playsInline className="w-1/2 rounded-2xl shadow-xl border-4 border-purple-500" />
-          <video ref={remoteVideoRef} autoPlay playsInline className="w-1/2 rounded-2xl shadow-xl border-4 border-blue-500" />
+      <div className="flex-grow flex flex-col md:flex-row gap-4">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <video ref={localVideoRef} autoPlay muted playsInline className="w-full rounded-md shadow-lg border-2 border-green-500" />
+          <video ref={remoteVideoRef} autoPlay playsInline className="w-full rounded-md shadow-lg border-2 border-blue-500" />
         </div>
 
-        <div className="h-64 overflow-y-auto mb-4 p-6 bg-gray-100 dark:bg-gray-900 rounded-2xl">
-          {isTyping && <p className="text-gray-500 animate-pulse mb-2">Partner is typing...</p>}
-          {chatMessages.map((msg, i) => (
-            <p key={i} className={`mb-3 ${msg.from === 'me' ? 'text-right text-blue-400' : 'text-left text-green-400'}`}>
-              {msg.text}
-            </p>
-          ))}
-          <div ref={chatEndRef} />
-        </div>
+        <div className="flex flex-col h-64 md:h-auto flex-1">
+          <div className="flex-grow overflow-y-auto p-4 bg-gray-800 rounded-md mb-4">
+            {isTyping && <p className="text-gray-400 animate-pulse">Typing...</p>}
+            {chatMessages.map((msg, i) => (
+              <p key={i} className={`mb-2 ${msg.from === 'me' ? 'text-right text-green-400' : 'text-left text-blue-400'}`}>
+                {msg.text}
+              </p>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
 
-        <div className="flex gap-3 mb-6">
-          <input
-            type="text"
-            value={message}
-            onChange={(e) => {
-              setMessage(e.target.value);
-              handleTyping();
-            }}
-            onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="Type a message..."
-            className="flex-1 p-4 rounded-2xl bg-gray-800 text-white placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500"
-          />
-          <button onClick={sendMessage} className="px-8 bg-purple-600 hover:bg-purple-700 rounded-2xl font-bold transition">
-            Send
-          </button>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                handleTyping();
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              placeholder="Message..."
+              className="flex-1 p-3 bg-gray-800 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button onClick={sendMessage} className="px-4 py-3 bg-green-600 hover:bg-green-700 rounded-md">
+              Send
+            </button>
+          </div>
         </div>
+      </div>
 
-        <div className="flex justify-center gap-8">
-          <button onClick={skipChat} className="px-12 py-4 bg-yellow-600 hover:bg-yellow-700 rounded-2xl text-xl font-bold transition">
-            Next
-          </button>
-          <button onClick={reportUser} className="px-12 py-4 bg-red-600 hover:bg-red-700 rounded-2xl text-xl font-bold transition">
-            Report
-          </button>
-        </div>
+      <div className="flex justify-center gap-4 mt-4">
+        <button onClick={skipChat} className="px-6 py-3 bg-yellow-600 hover:bg-yellow-700 rounded-md">
+          Next
+        </button>
+        <button onClick={reportUser} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-md">
+          Report
+        </button>
       </div>
     </div>
   );

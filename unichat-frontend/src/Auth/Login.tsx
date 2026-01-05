@@ -1,4 +1,4 @@
-// frontend/src/components/Login.tsx - Updated for password
+// frontend/src/components/Login.tsx - Refactored UI
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -23,7 +23,7 @@ const Login: React.FC = () => {
     setLoading(true);
     try {
       const response = await api.post('/auth/login', { email, password });
-      await login(response.data.token); // Pass only token; handle user in context
+      await login(response.data.token);
       toast.success('Login successful!');
       navigate('/home');
     } catch (err: any) {
@@ -35,19 +35,17 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600">
-      <div className="p-8 bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-96">
-        <h1 className="text-4xl font-bold text-center mb-2">Unichat</h1>
-        <p className="text-center text-gray-600 dark:text-gray-400 mb-8">
-          Connect with students across Nigerian universities 🇳🇬
-        </p>
-        <form onSubmit={handleSubmit}>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-800 to-blue-900">
+      <div className="p-6 bg-gray-900 rounded-lg shadow-lg w-full max-w-md">
+        <h1 className="text-3xl font-bold text-center mb-6 text-green-400">Unichat 🇳🇬</h1>
+        <p className="text-center text-gray-300 mb-6">Connect with Nigerian university students</p>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="email"
-            placeholder="Your school email"
+            placeholder="School email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full mb-4 p-4 border rounded-lg dark:bg-gray-700 text-lg"
+            className="w-full p-3 bg-gray-800 text-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
             required
             disabled={loading}
           />
@@ -56,23 +54,20 @@ const Login: React.FC = () => {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full mb-6 p-4 border rounded-lg dark:bg-gray-700 text-lg"
+            className="w-full p-3 bg-gray-800 text-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
             required
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 rounded-lg text-lg transition"
+            className="w-full p-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition"
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm">
-          Don't have an account? <a href="/register" className="text-blue-600 hover:underline">Register</a>
-        </p>
-        <p className="mt-2 text-center text-sm text-gray-500">
-          Only verified university emails allowed
+        <p className="mt-4 text-center text-sm text-gray-400">
+          No account? <a href="/register" className="text-green-400 hover:underline">Register</a>
         </p>
       </div>
     </div>

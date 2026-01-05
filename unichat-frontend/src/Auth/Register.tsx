@@ -1,4 +1,4 @@
-// frontend/src/components/Register.tsx - New component for register (add this file)
+// frontend/src/components/Register.tsx - Refactored UI
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -28,25 +28,25 @@ const Register: React.FC = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-500 to-purple-600">
-      <div className="p-8 bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-96">
-        <h1 className="text-4xl font-bold text-center mb-2">Unichat Register</h1>
-        <form onSubmit={handleSubmit}>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-green-800 to-blue-900">
+      <div className="p-6 bg-gray-900 rounded-lg shadow-lg w-full max-w-md">
+        <h1 className="text-3xl font-bold text-center mb-6 text-green-400">Join Unichat 🇳🇬</h1>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
-            placeholder="Your name"
+            placeholder="Full name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full mb-4 p-4 border rounded-lg dark:bg-gray-700 text-lg"
+            className="w-full p-3 bg-gray-800 text-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
             required
             disabled={loading}
           />
           <input
             type="email"
-            placeholder="Your school email"
+            placeholder="School email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full mb-4 p-4 border rounded-lg dark:bg-gray-700 text-lg"
+            className="w-full p-3 bg-gray-800 text-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
             required
             disabled={loading}
           />
@@ -55,20 +55,20 @@ const Register: React.FC = () => {
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full mb-6 p-4 border rounded-lg dark:bg-gray-700 text-lg"
+            className="w-full p-3 bg-gray-800 text-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
             required
             disabled={loading}
           />
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-4 rounded-lg text-lg transition"
+            className="w-full p-3 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition"
           >
             {loading ? 'Registering...' : 'Register'}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm">
-          Already have an account? <a href="/" className="text-blue-600 hover:underline">Login</a>
+        <p className="mt-4 text-center text-sm text-gray-400">
+          Have an account? <a href="/login" className="text-green-400 hover:underline">Login</a>
         </p>
       </div>
     </div>

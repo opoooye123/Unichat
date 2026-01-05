@@ -1,5 +1,4 @@
-// Home.tsx updated with Logo.dev and email_domain
-
+// Home.tsx - Refactored UI with searchable schools
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../hook/useAuth';
 import { useSocket } from '../hook/useSocket';
@@ -10,7 +9,8 @@ import api from '../utils/api';
 interface School {
   id: string;
   name: string;
-  email_domain: string; // UPDATED: Add email_domain
+  email_domain: string;
+  logo_url?: string; // Optional for official logos
 }
 
 const Home: React.FC = () => {
@@ -19,13 +19,16 @@ const Home: React.FC = () => {
   const [selected, setSelected] = useState<'any' | 'same' | string>('any');
   const [inQueue, setInQueue] = useState(false);
   const [schools, setSchools] = useState<School[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredSchools, setFilteredSchools] = useState<School[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchSchools = async () => {
       try {
         const res = await api.get('/schools');
-        setSchools(res.data); // Now includes email_domain
+        setSchools(res.data);
+        setFilteredSchools(res.data); // Initial filter
       } catch (err) {
         toast.error('Failed to load schools');
       }
@@ -34,17 +37,23 @@ const Home: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const filtered = schools.filter(school =>
+      school.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredSchools(filtered);
+  }, [searchTerm, schools]);
+
+  useEffect(() => {
     if (!socket) return;
     socket.on('matchFound', ({ sessionId, partnerId, isInitiator }) => {
       toast.dismiss('queue');
-      toast.success('Match found! 🎉 Starting chat...');
+      toast.success('Match found! 🎉');
       setInQueue(false);
       navigate('/chat', { state: { sessionId, partnerId, isInitiator } });
     });
     socket.on('rejoinQueue', () => {
       setInQueue(true);
-      toast.dismiss('queue');
-      toast.loading('Searching for someone... ⏳', { id: 'queue' });
+      toast.loading('Searching...', { id: 'queue' });
     });
     return () => {
       socket.off('matchFound');
@@ -55,7 +64,7 @@ const Home: React.FC = () => {
   const handleJoinQueue = () => {
     if (!socket) return toast.error('Connection error');
     setInQueue(true);
-    toast.loading('Searching for someone... ⏳', { id: 'queue' });
+    toast.loading('Searching...', { id: 'queue' });
     socket.emit('joinQueue', { targetSchool: selected });
   };
 
@@ -67,83 +76,81 @@ const Home: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-purple-500 to-blue-600 p-6">
-      <div className="w-full max-w-xl bg-white dark:bg-gray-800 rounded-3xl shadow-2xl p-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-600 to-pink-600">
-            Unichat
-          </h1>
-          <p className="text-xl">Welcome, {user?.name}!</p>
+    <div className="flex flex-col items-center min-h-screen bg-gradient-to-br from-green-800 to-blue-900 p-6 text-gray-200">
+      <header className="w-full max-w-xl mb-8">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-green-400">Unichat 🇳🇬</h1>
+          <button onClick={logout} className="text-gray-400 hover:text-red-500">Logout</button>
         </div>
-        <p className="text-2xl mb-8 text-center">Who do you want to chat with? 👥</p>
-        <div className="space-y-4 mb-10">
+        <p className="text-xl mt-2">Welcome, {user?.name}!</p>
+      </header>
+
+      <main className="w-full max-w-xl bg-gray-900 rounded-lg shadow-lg p-6 space-y-6">
+        <h2 className="text-2xl font-semibold text-center">Chat with...?</h2>
+        
+        <div className="grid grid-cols-1 gap-4">
           <button
             onClick={() => setSelected('any')}
-            className={`w-full p-6 rounded-2xl transition flex items-center gap-4 ${
-              selected === 'any' ? 'bg-purple-600 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
-            }`}
+            className={`p-4 rounded-md flex items-center gap-3 ${selected === 'any' ? 'bg-green-600' : 'bg-gray-800 hover:bg-gray-700'}`}
           >
-            <div className="text-3xl">🌍</div>
-            <div className="text-left flex-1">
-              <div className="text-2xl font-bold">Anyone</div>
-              <div className="text-gray-600 dark:text-gray-400">Random student from any uni</div>
-            </div>
+            <span className="text-2xl">🌍</span>
+            <div>Anyone (Random across unis)</div>
           </button>
           <button
             onClick={() => setSelected('same')}
-            className={`w-full p-6 rounded-2xl transition flex items-center gap-4 ${
-              selected === 'same' ? 'bg-purple-600 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
-            }`}
+            className={`p-4 rounded-md flex items-center gap-3 ${selected === 'same' ? 'bg-green-600' : 'bg-gray-800 hover:bg-gray-700'}`}
           >
-            <div className="text-3xl">🏫</div>
-            <div className="text-left flex-1">
-              <div className="text-2xl font-bold">My School</div>
-              <div className="text-gray-600 dark:text-gray-400">Someone from {user?.schoolId}</div>
-            </div>
+            <span className="text-2xl">🏫</span>
+            <div>My School ({user?.schoolId})</div>
           </button>
-          {schools.map((school) => (
+        </div>
+
+        <input
+          type="text"
+          placeholder="Search university..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full p-3 bg-gray-800 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+        />
+
+        <div className="max-h-48 overflow-y-auto space-y-2">
+          {filteredSchools.map((school) => (
             <button
               key={school.id}
               onClick={() => setSelected(school.id)}
-              className={`w-full p-6 rounded-2xl transition flex items-center gap-4 ${
-                selected === school.id ? 'bg-purple-600 text-white' : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
-              }`}
+              className={`w-full p-3 rounded-md flex items-center gap-3 ${selected === school.id ? 'bg-green-600' : 'bg-gray-800 hover:bg-gray-700'}`}
             >
               <img
-                src={`https://img.logo.dev/${school.email_domain}?size=80&fallback=monogram`} // UPDATED: Use Logo.dev with email_domain
+                src={`https://logo.clearbit.com/${school.email_domain}?size=40`} // Switched to Clearbit
                 alt={school.name}
-                className="w-16 h-16 rounded-full bg-white shadow-lg"
-                onError={(e) => (e.currentTarget.src = `https://picsum.photos/80/80?random=${school.id}`)}
+                className="w-10 h-10 rounded-full"
+                onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/40?text=' + school.name[0])}
               />
-              <div className="text-left flex-1">
-                <div className="text-2xl font-bold">{school.name}</div>
-                <div className="text-gray-600 dark:text-gray-400">Chat with students from {school.name}</div>
-              </div>
+              <div>{school.name}</div>
             </button>
           ))}
+          {filteredSchools.length === 0 && <p className="text-center text-gray-400">No schools found</p>}
         </div>
+
         {!inQueue ? (
           <button
             onClick={handleJoinQueue}
-            className="w-full py-6 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-2xl font-bold rounded-3xl shadow-2xl transform hover:scale-105 transition"
+            className="w-full p-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition"
           >
             Start Chatting 🔥
           </button>
         ) : (
-          <div className="text-center">
-            <p className="text-3xl mb-6 animate-pulse">🔍 Searching for your match...</p>
+          <div className="text-center space-y-4">
+            <p className="animate-pulse">Searching for match...</p>
             <button
               onClick={handleCancel}
-              className="px-12 py-5 bg-red-600 hover:bg-red-700 text-white text-xl font-bold rounded-2xl"
+              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-md"
             >
-              Cancel Search
+              Cancel
             </button>
           </div>
         )}
-      </div>
-      <button onClick={logout} className="block mx-auto mt-10 text-gray-600 hover:text-red-600">
-        Logout
-      </button>
+      </main>
     </div>
   );
 };
