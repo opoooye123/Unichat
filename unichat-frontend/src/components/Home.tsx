@@ -79,7 +79,7 @@ const Home: React.FC = () => {
     <div className="flex flex-col items-center min-h-screen bg-gradient-to-br from-green-800 to-blue-900 p-6 text-gray-200">
       <header className="w-full max-w-xl mb-8">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-green-400">Unichat 🇳🇬</h1>
+          <h1 className="text-3xl font-bold text-green-400">NaijaCampus 🇳🇬</h1>
           <button onClick={logout} className="text-gray-400 hover:text-red-500">Logout</button>
         </div>
         <p className="text-xl mt-2">Welcome, {user?.name}!</p>
