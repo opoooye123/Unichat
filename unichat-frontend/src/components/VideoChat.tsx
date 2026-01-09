@@ -1,4 +1,4 @@
-// src/components/VideoChat.tsx - Refactored UI
+// src/components/VideoChat.tsx - Refactored UI (handlers restored)
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useSocket } from '../hook/useSocket';
@@ -257,77 +257,77 @@ const VideoChat: React.FC = () => {
     }
   };
 
-  return(
-<div className="flex flex-col min-h-screen bg-gradient-to-br from-green-800 to-blue-900 p-2 text-gray-200">
-  <header className="text-center mb-2 md:mb-4">
-    <h1 className="text-xl md:text-2xl font-bold text-green-400">Video Chat</h1>
-  </header>
+  return (
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-green-800 to-blue-900 p-2 text-gray-200">
+      <header className="text-center mb-2 md:mb-4">
+        <h1 className="text-xl md:text-2xl font-bold text-green-400">Video Chat</h1>
+      </header>
 
-  <div className="flex flex-col md:flex-row flex-grow gap-2 md:gap-4">
-    {/* Video Section */}
-    <div className="flex flex-col md:flex-row flex-1 gap-2 md:gap-4">
-      <video
-        ref={localVideoRef}
-        autoPlay
-        muted
-        playsInline
-        className="w-full md:w-1/2 h-48 md:h-auto rounded-md shadow-lg border-2 border-green-500 object-cover"
-      />
-      <video
-        ref={remoteVideoRef}
-        autoPlay
-        playsInline
-        className="w-full md:w-1/2 h-48 md:h-auto rounded-md shadow-lg border-2 border-blue-500 object-cover"
-      />
-    </div>
+      <div className="flex flex-col md:flex-row flex-grow gap-2 md:gap-4">
+        {/* Video Section */}
+        <div className="flex flex-col md:flex-row flex-1 gap-2 md:gap-4">
+          <video
+            ref={localVideoRef}
+            autoPlay
+            muted
+            playsInline
+            className="w-full md:w-1/2 h-48 md:h-auto rounded-md shadow-lg border-2 border-green-500 object-cover"
+          />
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            className="w-full md:w-1/2 h-48 md:h-auto rounded-md shadow-lg border-2 border-blue-500 object-cover"
+          />
+        </div>
 
-    {/* Chat Section */}
-    <div className="flex flex-col flex-1 h-60 md:h-auto">
-      <div className="flex-grow overflow-y-auto p-2 md:p-4 bg-gray-800 rounded-md mb-2 md:mb-4">
-        {isTyping && <p className="text-gray-400 animate-pulse">Typing...</p>}
-        {chatMessages.map((msg, i) => (
-          <p
-            key={i}
-            className={`mb-1 md:mb-2 ${msg.from === 'me' ? 'text-right text-green-400' : 'text-left text-blue-400'}`}
-          >
-            {msg.text}
-          </p>
-        ))}
-        <div ref={chatEndRef} />
+        {/* Chat Section */}
+        <div className="flex flex-col flex-1 h-60 md:h-auto">
+          <div className="flex-grow overflow-y-auto p-2 md:p-4 bg-gray-800 rounded-md mb-2 md:mb-4">
+            {isTyping && <p className="text-gray-400 animate-pulse">Typing...</p>}
+            {chatMessages.map((msg, i) => (
+              <p
+                key={i}
+                className={`mb-1 md:mb-2 ${msg.from === 'me' ? 'text-right text-green-400' : 'text-left text-blue-400'}`}
+              >
+                {msg.text}
+              </p>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => {
+                setMessage(e.target.value);
+                handleTyping();
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+              placeholder="Message..."
+              className="flex-1 p-2 md:p-3 bg-gray-800 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              onClick={sendMessage}
+              className="px-4 py-2 md:px-4 md:py-3 bg-green-600 hover:bg-green-700 rounded-md text-sm md:text-base"
+            >
+              Send
+            </button>
+          </div>
+        </div>
       </div>
 
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={message}
-          onChange={(e) => {
-            setMessage(e.target.value);
-            handleTyping();
-          }}
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-          placeholder="Message..."
-          className="flex-1 p-2 md:p-3 bg-gray-800 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-        />
-        <button
-          onClick={sendMessage}
-          className="px-4 py-2 md:px-4 md:py-3 bg-green-600 hover:bg-green-700 rounded-md text-sm md:text-base"
-        >
-          Send
+      <div className="flex flex-col md:flex-row justify-center gap-2 md:gap-4 mt-2 md:mt-4">
+        {/* Handlers re-attached so functions are actually used */}
+        <button onClick={skipChat} className="px-4 py-2 md:px-6 md:py-3 bg-yellow-600 hover:bg-yellow-700 rounded-md">
+          Next
+        </button>
+        <button onClick={reportUser} className="px-4 py-2 md:px-6 md:py-3 bg-red-600 hover:bg-red-700 rounded-md">
+          Report
         </button>
       </div>
     </div>
-  </div>
-
-  <div className="flex flex-col md:flex-row justify-center gap-2 md:gap-4 mt-2 md:mt-4">
-    <button className="px-4 py-2 md:px-6 md:py-3 bg-yellow-600 hover:bg-yellow-700 rounded-md">
-      Next
-    </button>
-    <button className="px-4 py-2 md:px-6 md:py-3 bg-red-600 hover:bg-red-700 rounded-md">
-      Report
-    </button>
-  </div>
-</div>
-
   );
 };
 
