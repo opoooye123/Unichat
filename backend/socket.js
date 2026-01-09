@@ -40,6 +40,9 @@ const socketHandler = (io) => {
     console.log(`User connected: ${user.name} (${userId}) from ${schoolId} | Socket ID: ${socket.id}`);
     connectedUsers.set(userId, { socketId: socket.id, schoolId });
 
+    // Emit updated online count on connect
+    io.emit('onlineUsers', connectedUsers.size);
+
     const leaveQueue = () => {
       matchQueues.get(schoolId)?.delete(userId);
       userPreferences.delete(userId);
@@ -50,8 +53,8 @@ const socketHandler = (io) => {
       if (!preferences) return;
 
       const candidates = [];
-      const targetSchools = preferences.targetSchool === 'any' 
-        ? Array.from(matchQueues.keys()) 
+      const targetSchools = preferences.targetSchool === 'any'
+        ? Array.from(matchQueues.keys())
         : (preferences.targetSchool === 'same' ? [schoolId] : [preferences.targetSchool]);
 
       for (const s of targetSchools) {
@@ -62,9 +65,9 @@ const socketHandler = (io) => {
           if (!cPref || cPref.lastPartner === userId || preferences.lastPartner === candidateId) continue;
 
           // Simple mutual check
-          const matchesUser = preferences.targetSchool === 'any' || 
+          const matchesUser = preferences.targetSchool === 'any' ||
             (preferences.targetSchool === 'same' && s === schoolId) || preferences.targetSchool === s;
-          const matchesCandidate = cPref.targetSchool === 'any' || 
+          const matchesCandidate = cPref.targetSchool === 'any' ||
             (cPref.targetSchool === 'same' && s === cPref.ownSchool) || cPref.targetSchool === schoolId;
 
           if (matchesUser && matchesCandidate) candidates.push({ id: candidateId, school: s });
@@ -101,15 +104,15 @@ const socketHandler = (io) => {
           const initiatorId = userId < partnerId ? userId : partnerId;
           const isUserInitiator = initiatorId === userId;
 
-          io.to(s1).emit("matchFound", { 
-            sessionId: session._id, 
-            partnerId, 
-            isInitiator: isUserInitiator 
+          io.to(s1).emit("matchFound", {
+            sessionId: session._id,
+            partnerId,
+            isInitiator: isUserInitiator
           });
-          io.to(s2).emit("matchFound", { 
-            sessionId: session._id, 
-            partnerId: userId, 
-            isInitiator: !isUserInitiator 
+          io.to(s2).emit("matchFound", {
+            sessionId: session._id,
+            partnerId: userId,
+            isInitiator: !isUserInitiator
           });
         } catch (err) {
           console.error("Session creation failed:", err);
@@ -170,6 +173,8 @@ const socketHandler = (io) => {
     socket.on("disconnect", () => {
       connectedUsers.delete(userId);
       leaveQueue();
+      // Emit updated online count on disconnect
+      io.emit('onlineUsers', connectedUsers.size);
     });
   });
 };

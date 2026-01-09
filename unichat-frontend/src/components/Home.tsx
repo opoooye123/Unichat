@@ -21,6 +21,7 @@ const Home: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filteredSchools, setFilteredSchools] = useState<School[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState(0); // NEW: Online count state
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -55,9 +56,14 @@ const Home: React.FC = () => {
       setInQueue(true);
       toast.loading('Searching...', { id: 'queue' });
     });
+    // NEW: Online users listener
+    socket.on('onlineUsers', (count) => {
+      setOnlineUsers(count);
+    });
     return () => {
       socket.off('matchFound');
       socket.off('rejoinQueue');
+      socket.off('onlineUsers');
     };
   }, [socket, navigate]);
 
@@ -80,6 +86,7 @@ const Home: React.FC = () => {
       <header className="w-full max-w-xl mb-8">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-green-400">NaijaCampus 🇳🇬</h1>
+          <span className="text-green-300">{onlineUsers} online 📱</span> {/* NEW: Display count */}
           <button onClick={logout} className="text-gray-400 hover:text-red-500">Logout</button>
         </div>
         <p className="text-xl mt-2">Welcome, {user?.name}!</p>
