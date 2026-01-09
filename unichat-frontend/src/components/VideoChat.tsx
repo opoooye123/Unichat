@@ -257,8 +257,8 @@ const VideoChat: React.FC = () => {
     }
   };
 
-  return (
-  <div className="flex flex-col min-h-screen bg-gradient-to-br from-green-800 to-blue-900 p-2 text-gray-200">
+  return(
+<div className="flex flex-col min-h-screen bg-gradient-to-br from-green-800 to-blue-900 p-2 text-gray-200">
   <header className="text-center mb-2 md:mb-4">
     <h1 className="text-xl md:text-2xl font-bold text-green-400">Video Chat</h1>
   </header>
